@@ -154,6 +154,12 @@ pub struct ProcessHarvest {
 
     /// The kernel scheduling priority.
     pub priority: i32,
+
+    /// Estimated Private Commit on Linux: `VmData + VmStk` from
+    /// `/proc/<pid>/status`. Kept as bytes; 0 when unavailable.
+    /// Approximates NT "Private Bytes" / per-process commit charge.
+    #[cfg(target_os = "linux")]
+    pub private_commit: u64,
     // TODO: Additional fields
     // pub rss_kb: u64,
     // pub virt_kb: u64,

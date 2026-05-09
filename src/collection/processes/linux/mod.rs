@@ -141,6 +141,7 @@ fn read_proc(
         pid: _pid,
         uid,
         stat,
+        status,
         io,
         cmdline,
     } = process;
@@ -289,6 +290,7 @@ fn read_proc(
             #[cfg(unix)]
             nice: stat.nice,
             priority: stat.priority,
+            private_commit: status.as_ref().map(|s| s.private_commit_bytes()).unwrap_or(0),
         },
         new_process_times,
     ))

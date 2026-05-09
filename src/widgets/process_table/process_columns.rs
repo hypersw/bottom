@@ -33,6 +33,10 @@ pub enum ProcColumn {
     #[cfg(unix)]
     Nice,
     Priority,
+    /// NT-style "Private Bytes" estimate: `VmData + VmStk` per process.
+    /// Linux-only because it depends on `/proc/<pid>/status`.
+    #[cfg(target_os = "linux")]
+    PrivateCommit,
     #[cfg(feature = "gpu")]
     GpuMemValue,
     #[cfg(feature = "gpu")]
@@ -69,6 +73,8 @@ impl ProcColumn {
             #[cfg(unix)]
             ProcColumn::Nice => &["Nice"],
             ProcColumn::Priority => &["Priority"],
+            #[cfg(target_os = "linux")]
+            ProcColumn::PrivateCommit => &["PrivCmt", "PrivateCommit", "Private Commit", "PrivateBytes"],
         }
     }
 }
@@ -94,6 +100,8 @@ impl ColumnHeader for ProcColumn {
             #[cfg(unix)]
             ProcColumn::Nice => "Nice",
             ProcColumn::Priority => "Priority",
+            #[cfg(target_os = "linux")]
+            ProcColumn::PrivateCommit => "PrivCmt",
             #[cfg(feature = "gpu")]
             ProcColumn::GpuMemValue => "GMem",
             #[cfg(feature = "gpu")]
@@ -182,6 +190,12 @@ impl SortsRow for ProcColumn {
             ProcColumn::Priority => {
                 data.sort_by(|a, b| sort_partial_fn(descending)(a.priority, b.priority));
             }
+            #[cfg(target_os = "linux")]
+            ProcColumn::PrivateCommit => {
+                data.sort_by(|a, b| {
+                    sort_partial_fn(descending)(a.private_commit, b.private_commit)
+                });
+            }
             #[cfg(unix)]
             ProcColumn::Nice => {
                 data.sort_by(|a, b| sort_partial_fn(descending)(a.nice, b.nice));
@@ -224,6 +238,10 @@ impl<'de> Deserialize<'de> for ProcColumn {
             #[cfg(unix)]
             "nice" => Ok(ProcColumn::Nice),
             "priority" => Ok(ProcColumn::Priority),
+            #[cfg(target_os = "linux")]
+            "privcmt" | "privatecommit" | "private commit" | "privatebytes" | "private_commit" => {
+                Ok(ProcColumn::PrivateCommit)
+            }
             #[cfg(feature = "gpu")]
             "gmem" | "gmem%" => Ok(ProcColumn::GpuMemPercent),
             #[cfg(feature = "gpu")]
@@ -251,6 +269,8 @@ impl From<&ProcColumn> for ProcWidgetColumn {
             ProcColumn::User => ProcWidgetColumn::User,
             ProcColumn::Time => ProcWidgetColumn::Time,
             ProcColumn::Priority => ProcWidgetColumn::Priority,
+            #[cfg(target_os = "linux")]
+            ProcColumn::PrivateCommit => ProcWidgetColumn::PrivateCommit,
             #[cfg(unix)]
             ProcColumn::Nice => ProcWidgetColumn::Nice,
             #[cfg(feature = "gpu")]

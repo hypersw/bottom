@@ -166,6 +166,8 @@ fn make_column(column: ProcColumn) -> SortColumn<ProcColumn> {
         State => SortColumn::hard(State, 9),
         Time => SortColumn::new(Time),
         Priority => SortColumn::new(Priority).default_descending(),
+        #[cfg(target_os = "linux")]
+        PrivateCommit => SortColumn::hard(PrivateCommit, 8).default_descending(),
         #[cfg(unix)]
         Nice => SortColumn::new(Nice),
         #[cfg(feature = "gpu")]
@@ -202,6 +204,8 @@ pub enum ProcWidgetColumn {
     State,
     Time,
     Priority,
+    #[cfg(target_os = "linux")]
+    PrivateCommit,
     #[cfg(unix)]
     Nice,
     #[cfg(feature = "gpu")]
@@ -347,6 +351,8 @@ impl ProcWidgetState {
                             ProcWidgetColumn::State => State,
                             ProcWidgetColumn::Time => Time,
                             ProcWidgetColumn::Priority => Priority,
+                            #[cfg(target_os = "linux")]
+                            ProcWidgetColumn::PrivateCommit => PrivateCommit,
                             #[cfg(unix)]
                             ProcWidgetColumn::Nice => Nice,
                             #[cfg(feature = "gpu")]
@@ -405,6 +411,8 @@ impl ProcWidgetState {
                     User => ProcWidgetColumn::User,
                     Time => ProcWidgetColumn::Time,
                     Priority => ProcWidgetColumn::Priority,
+                    #[cfg(target_os = "linux")]
+                    PrivateCommit => ProcWidgetColumn::PrivateCommit,
                     #[cfg(unix)]
                     Nice => ProcWidgetColumn::Nice,
                     #[cfg(feature = "gpu")]

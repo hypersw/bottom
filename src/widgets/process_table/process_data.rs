@@ -221,6 +221,9 @@ pub struct ProcWidgetData {
     #[cfg(unix)]
     pub nice: i32,
     pub priority: i32,
+    /// Private Commit estimate in bytes (`VmData + VmStk`). Linux-only.
+    #[cfg(target_os = "linux")]
+    pub private_commit: u64,
 }
 
 impl ProcWidgetData {
@@ -270,6 +273,8 @@ impl ProcWidgetData {
             #[cfg(unix)]
             nice: process.nice,
             priority: process.priority,
+            #[cfg(target_os = "linux")]
+            private_commit: process.private_commit,
         }
     }
 
@@ -298,6 +303,10 @@ impl ProcWidgetData {
         self.total_read += other.total_read;
         self.total_write += other.total_write;
         self.time = self.time.max(other.time);
+        #[cfg(target_os = "linux")]
+        {
+            self.private_commit = self.private_commit.saturating_add(other.private_commit);
+        }
         #[cfg(feature = "gpu")]
         {
             self.gpu_mem_usage = match (&self.gpu_mem_usage, &other.gpu_mem_usage) {
@@ -334,6 +343,8 @@ impl ProcWidgetData {
                 .map(|user| user.to_string())
                 .unwrap_or_else(|| "N/A".to_string()),
             ProcColumn::Time => format_time(self.time),
+            #[cfg(target_os = "linux")]
+            ProcColumn::PrivateCommit => binary_byte_string(self.private_commit),
             #[cfg(feature = "gpu")]
             ProcColumn::GpuMemValue | ProcColumn::GpuMemPercent => self.gpu_mem_usage.to_string(),
             #[cfg(feature = "gpu")]
@@ -376,6 +387,8 @@ impl DataToCell<ProcColumn> for ProcWidgetData {
                 .map(|user| user.to_string().into())
                 .unwrap_or_else(|| "N/A".into()),
             ProcColumn::Time => format_time(self.time).into(),
+            #[cfg(target_os = "linux")]
+            ProcColumn::PrivateCommit => binary_byte_string(self.private_commit).into(),
             #[cfg(feature = "gpu")]
             ProcColumn::GpuMemValue | ProcColumn::GpuMemPercent => {
                 self.gpu_mem_usage.to_string().into()
