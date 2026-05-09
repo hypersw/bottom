@@ -1,4 +1,4 @@
-use std::{fs, path::Path};
+use std::{fs, path::Path, sync::OnceLock};
 
 /// Whether the temperature should *actually* be read during enumeration.
 /// Will return false if the state is not D0/unknown, or if it does not support
@@ -27,4 +27,34 @@ pub fn is_device_awake(device: &Path) -> bool {
     } else {
         true
     }
+}
+
+/// `vm.overcommit_memory` mode, cached for the lifetime of the process.
+///
+/// Possible values per Documentation/admin-guide/sysctl/vm.rst:
+///   0 = heuristic (default)
+///   1 = always overcommit
+///   2 = strict — never exceed `CommitLimit`; mmap fails with `ENOMEM`
+///       once `Committed_AS` would cross the limit
+///
+/// We read this exactly once. Operators *can* change it at runtime via
+/// sysctl, but the practical reason we care (column visibility, gauge
+/// display) is set up at app start and rebuilding everything mid-session is
+/// not worth the complexity. Restart `btm` to pick up a change.
+pub fn overcommit_mode() -> u8 {
+    static MODE: OnceLock<u8> = OnceLock::new();
+    *MODE.get_or_init(|| {
+        fs::read_to_string("/proc/sys/vm/overcommit_memory")
+            .ok()
+            .and_then(|s| s.trim().parse::<u8>().ok())
+            .unwrap_or(0)
+    })
+}
+
+/// Convenience: are we under strict no-overcommit (`overcommit_memory=2`)?
+/// On non-Linux this function is absent — gate callers with `cfg(target_os
+/// = "linux")` or check via [`overcommit_mode`] only inside Linux paths.
+#[inline]
+pub fn is_strict_overcommit() -> bool {
+    overcommit_mode() == 2
 }

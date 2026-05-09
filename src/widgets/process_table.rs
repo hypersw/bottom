@@ -371,7 +371,7 @@ impl ProcWidgetState {
                     })
                     .collect(),
                 _ => {
-                    let default_columns = [
+                    let mut default_columns: Vec<ProcColumn> = vec![
                         if is_count { Count } else { Pid },
                         if is_command { Command } else { Name },
                         CpuPercent,
@@ -386,6 +386,20 @@ impl ProcWidgetState {
                         Priority,
                         // Maybe add nice back as a default when I can figure out how to do the default configs better for Windows? As currently otherwise there's a mismatch.
                     ];
+
+                    // Strict-overcommit-aware default: when the kernel runs
+                    // `vm.overcommit_memory=2`, allocations are gated by
+                    // `Committed_AS`, and the per-process number that matters
+                    // is Private Commit (≈ NT "Private Bytes"). Surface it
+                    // by default in this mode so operators can immediately
+                    // see who is eating commit headroom. A user-supplied
+                    // `processes.columns` list overrides this branch.
+                    #[cfg(target_os = "linux")]
+                    if crate::collection::linux::utils::is_strict_overcommit() {
+                        // Insert right after the Mem column (index 3) — reads
+                        // naturally next to the resident-memory number.
+                        default_columns.insert(4, PrivateCommit);
+                    }
 
                     default_columns.into_iter().map(make_column).collect()
                 }

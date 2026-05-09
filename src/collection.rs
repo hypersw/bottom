@@ -9,7 +9,7 @@ pub mod nvidia;
 pub mod amd;
 
 #[cfg(target_os = "linux")]
-mod linux {
+pub(crate) mod linux {
     pub mod utils;
 }
 
