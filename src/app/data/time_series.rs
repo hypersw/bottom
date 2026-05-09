@@ -48,6 +48,10 @@ pub struct TimeSeriesData {
     /// Cache data.
     pub cache_mem: Values,
 
+    /// Commit charge — `Committed_AS / CommitLimit`. Linux-only.
+    #[cfg(target_os = "linux")]
+    pub commit: Values,
+
     #[cfg(feature = "zfs")]
     /// Arc data.
     pub arc_mem: Values,
@@ -118,6 +122,15 @@ impl TimeSeriesData {
                 self.cache_mem.push(cache.percentage());
             } else {
                 self.cache_mem.insert_break();
+            }
+        }
+
+        #[cfg(target_os = "linux")]
+        {
+            if let Some(commit) = &data.commit {
+                self.commit.push(commit.percentage());
+            } else {
+                self.commit.insert_break();
             }
         }
 
@@ -207,6 +220,9 @@ impl TimeSeriesData {
 
         #[cfg(not(target_os = "windows"))]
         let _ = self.cache_mem.prune_and_shrink_to_fit(end);
+
+        #[cfg(target_os = "linux")]
+        let _ = self.commit.prune_and_shrink_to_fit(end);
 
         #[cfg(feature = "zfs")]
         let _ = self.arc_mem.prune_and_shrink_to_fit(end);

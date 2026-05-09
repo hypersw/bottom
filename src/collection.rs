@@ -45,6 +45,11 @@ pub struct Data {
     #[cfg(not(target_os = "windows"))]
     pub cache: Option<memory::MemData>,
     pub swap: Option<memory::MemData>,
+    /// `Committed_AS` (used) over `CommitLimit` (total). Only collected on
+    /// Linux because that's the only platform we can read it from
+    /// `/proc/meminfo`.
+    #[cfg(target_os = "linux")]
+    pub commit: Option<memory::MemData>,
     pub temperature_sensors: Option<Vec<temperature::TempSensorData>>,
     pub network: Option<network::NetworkHarvest>,
     pub list_of_processes: Option<Vec<processes::ProcessHarvest>>,
@@ -68,6 +73,8 @@ impl Default for Data {
             #[cfg(not(target_os = "windows"))]
             cache: None,
             swap: None,
+            #[cfg(target_os = "linux")]
+            commit: None,
             temperature_sensors: None,
             list_of_processes: None,
             disks: None,
@@ -91,6 +98,10 @@ impl Data {
         self.disks = None;
         self.memory = None;
         self.swap = None;
+        #[cfg(target_os = "linux")]
+        {
+            self.commit = None;
+        }
         self.cpu = None;
         self.load_avg = None;
 
@@ -511,6 +522,14 @@ impl DataCollector {
             }
 
             self.data.swap = memory::get_swap_usage(&self.sys.system);
+
+            // Commit charge: cheap (one /proc/meminfo read) and only
+            // surfaced by the widget when `vm.overcommit_memory == 2`,
+            // so we always populate it on Linux without gating.
+            #[cfg(target_os = "linux")]
+            {
+                self.data.commit = memory::get_commit_usage();
+            }
         }
     }
 

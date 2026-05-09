@@ -25,6 +25,12 @@ pub struct StoredData {
     pub swap_harvest: Option<MemData>,
     #[cfg(not(target_os = "windows"))]
     pub cache_harvest: Option<MemData>,
+    /// Linux `Committed_AS` over `CommitLimit`, gated by
+    /// `is_strict_overcommit()` at render time. Always-populated; the
+    /// memory widget chooses whether to render based on overcommit mode
+    /// and config.
+    #[cfg(target_os = "linux")]
+    pub commit_harvest: Option<MemData>,
     #[cfg(feature = "zfs")]
     pub arc_harvest: Option<MemData>,
     #[cfg(feature = "gpu")]
@@ -50,6 +56,8 @@ impl Default for StoredData {
             #[cfg(not(target_os = "windows"))]
             cache_harvest: None,
             swap_harvest: None,
+            #[cfg(target_os = "linux")]
+            commit_harvest: None,
             cpu_harvest: cpu::CpuHarvest::default(),
             load_avg_harvest: cpu::LoadAvgHarvest::default(),
             process_data: Default::default(),
@@ -100,6 +108,11 @@ impl StoredData {
         #[cfg(not(target_os = "windows"))]
         {
             self.cache_harvest = data.cache;
+        }
+
+        #[cfg(target_os = "linux")]
+        {
+            self.commit_harvest = data.commit;
         }
 
         #[cfg(feature = "zfs")]

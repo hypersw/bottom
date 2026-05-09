@@ -113,6 +113,31 @@ impl Painter {
             }
         }
 
+        // Commit gauge: only meaningful — and only shown — under strict
+        // no-overbooking (`vm.overcommit_memory == 2`). RAM/swap-free can
+        // look healthy while this bar is the actual gating metric for
+        // whether the next big mmap (e.g. a VM start) succeeds.
+        #[cfg(target_os = "linux")]
+        if crate::collection::linux::utils::is_strict_overcommit() {
+            if let Some(commit_harvest) = &data.commit_harvest {
+                let commit_percentage = commit_harvest.percentage();
+                let commit_label =
+                    memory_label(commit_harvest, app_state.basic_mode_use_percent);
+
+                draw_widgets.push(
+                    PipeGauge::default()
+                        .ratio(commit_percentage / 100.0)
+                        .start_label("CMT")
+                        // Re-use the cache style — distinct from RAM/SWP,
+                        // and adding a dedicated palette entry would
+                        // require a config-schema bump for one bar.
+                        .inner_label(commit_label)
+                        .label_style(self.styles.cache_style)
+                        .gauge_style(self.styles.cache_style),
+                );
+            }
+        }
+
         #[cfg(feature = "zfs")]
         {
             if let Some(arc_harvest) = &data.arc_harvest {

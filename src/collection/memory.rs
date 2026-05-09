@@ -15,6 +15,11 @@ cfg_if::cfg_if! {
     }
 }
 
+#[cfg(target_os = "linux")]
+pub mod linux_commit;
+#[cfg(target_os = "linux")]
+pub(crate) use self::linux_commit::get_commit_usage;
+
 #[cfg(feature = "zfs")]
 pub mod arc;
 

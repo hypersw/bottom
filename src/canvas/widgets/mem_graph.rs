@@ -119,6 +119,21 @@ impl Painter {
                     );
                 }
 
+                // Commit charge line — only graphed under strict
+                // overcommit so the legend stays uncluttered on systems
+                // where `Committed_AS` doesn't gate allocations.
+                #[cfg(target_os = "linux")]
+                if crate::collection::linux::utils::is_strict_overcommit() {
+                    graph_data(
+                        &mut points,
+                        "CMT",
+                        data.commit_harvest.as_ref(),
+                        time,
+                        &timeseries.commit,
+                        self.styles.cache_style,
+                    );
+                }
+
                 #[cfg(feature = "zfs")]
                 {
                     graph_data(
