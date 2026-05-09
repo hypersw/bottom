@@ -209,7 +209,17 @@ impl SortsRow for ProcColumn {
             }
             #[cfg(target_os = "linux")]
             ProcColumn::Footprint => {
-                data.sort_by(|a, b| sort_partial_fn(descending)(a.footprint, b.footprint));
+                // Treat unreadable rows as 0 for sort purposes — under a
+                // descending sort that puts denied rows at the bottom
+                // alongside kernel threads, where they don't crowd the
+                // useful top of the list. The render still distinguishes
+                // them visually (em-dash vs "0B").
+                data.sort_by(|a, b| {
+                    sort_partial_fn(descending)(
+                        a.footprint.unwrap_or(0),
+                        b.footprint.unwrap_or(0),
+                    )
+                });
             }
             #[cfg(unix)]
             ProcColumn::Nice => {

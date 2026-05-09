@@ -292,7 +292,7 @@ fn read_proc(
             nice: stat.nice,
             priority: stat.priority,
             private_commit: status.as_ref().map(|s| s.private_commit_bytes()).unwrap_or(0),
-            footprint: smaps_rollup.as_ref().map(|s| s.footprint_bytes()).unwrap_or(0),
+            footprint: smaps_rollup.as_ref().map(|s| s.footprint_bytes()),
         },
         new_process_times,
     ))

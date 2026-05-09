@@ -162,12 +162,13 @@ pub struct ProcessHarvest {
     pub private_commit: u64,
 
     /// Memory Footprint on Linux: `Pss + SwapPss` from
-    /// `/proc/<pid>/smaps_rollup`. Kept as bytes; 0 when unavailable
-    /// (other-user processes without `CAP_SYS_PTRACE`). Closest single
-    /// number to "what closing this process actually frees from
-    /// RAM+swap, fair-share-divided across other mappers."
+    /// `/proc/<pid>/smaps_rollup`. `None` when not readable
+    /// (other-user processes without `CAP_SYS_PTRACE` — *not* the
+    /// same as a real 0, which is what kernel threads have). Closest
+    /// single number to "what closing this process actually frees
+    /// from RAM+swap, fair-share-divided across other mappers."
     #[cfg(target_os = "linux")]
-    pub footprint: u64,
+    pub footprint: Option<u64>,
     // TODO: Additional fields
     // pub rss_kb: u64,
     // pub virt_kb: u64,

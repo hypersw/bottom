@@ -224,9 +224,11 @@ pub struct ProcWidgetData {
     /// Private Commit estimate in bytes (`VmData + VmStk`). Linux-only.
     #[cfg(target_os = "linux")]
     pub private_commit: u64,
-    /// Memory Footprint in bytes (`Pss + SwapPss`). Linux-only.
+    /// Memory Footprint in bytes (`Pss + SwapPss`). `None` if
+    /// `smaps_rollup` was unreadable for the underlying process —
+    /// rendered as a "denied" placeholder, not as 0. Linux-only.
     #[cfg(target_os = "linux")]
-    pub footprint: u64,
+    pub footprint: Option<u64>,
 }
 
 impl ProcWidgetData {
@@ -279,7 +281,7 @@ impl ProcWidgetData {
             #[cfg(target_os = "linux")]
             private_commit: process.private_commit,
             #[cfg(target_os = "linux")]
-            footprint: process.footprint,
+            footprint: process.footprint,  // already Option<u64>; carry through
         }
     }
 
@@ -311,7 +313,15 @@ impl ProcWidgetData {
         #[cfg(target_os = "linux")]
         {
             self.private_commit = self.private_commit.saturating_add(other.private_commit);
-            self.footprint = self.footprint.saturating_add(other.footprint);
+            // Footprint: keep "denied" sticky in tree mode only when *all*
+            // members were denied. Otherwise sum the readable parts so the
+            // tree-row gives a useful lower bound. Mixed trees show a
+            // partial sum, which is the right semantics — we know at
+            // least this much, can't see the rest.
+            self.footprint = match (self.footprint, other.footprint) {
+                (None, None) => None,
+                (a, b) => Some(a.unwrap_or(0).saturating_add(b.unwrap_or(0))),
+            };
         }
         #[cfg(feature = "gpu")]
         {
@@ -352,7 +362,14 @@ impl ProcWidgetData {
             #[cfg(target_os = "linux")]
             ProcColumn::PrivateCommit => binary_byte_string(self.private_commit),
             #[cfg(target_os = "linux")]
-            ProcColumn::Footprint => binary_byte_string(self.footprint),
+            ProcColumn::Footprint => self
+                .footprint
+                .map(binary_byte_string)
+                // smaps_rollup unreadable (other-user proc, no
+                // CAP_SYS_PTRACE). Single-cell em-dash keeps the
+                // column from widening; emoji alternatives in module
+                // docs.
+                .unwrap_or_else(|| "—".to_string()),
             #[cfg(feature = "gpu")]
             ProcColumn::GpuMemValue | ProcColumn::GpuMemPercent => self.gpu_mem_usage.to_string(),
             #[cfg(feature = "gpu")]
@@ -398,7 +415,10 @@ impl DataToCell<ProcColumn> for ProcWidgetData {
             #[cfg(target_os = "linux")]
             ProcColumn::PrivateCommit => binary_byte_string(self.private_commit).into(),
             #[cfg(target_os = "linux")]
-            ProcColumn::Footprint => binary_byte_string(self.footprint).into(),
+            ProcColumn::Footprint => self
+                .footprint
+                .map(|b| Cow::Owned(binary_byte_string(b)))
+                .unwrap_or(Cow::Borrowed("—")),
             #[cfg(feature = "gpu")]
             ProcColumn::GpuMemValue | ProcColumn::GpuMemPercent => {
                 self.gpu_mem_usage.to_string().into()
