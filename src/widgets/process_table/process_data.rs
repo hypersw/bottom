@@ -366,10 +366,10 @@ impl ProcWidgetData {
                 .footprint
                 .map(binary_byte_string)
                 // smaps_rollup unreadable (other-user proc, no
-                // CAP_SYS_PTRACE). Single-cell em-dash keeps the
-                // column from widening; emoji alternatives in module
-                // docs.
-                .unwrap_or_else(|| "—".to_string()),
+                // CAP_SYS_PTRACE). U+2298 "circled solidus" — single
+                // terminal cell, reads as "denied / prohibited", and
+                // doesn't blow column width like an emoji would.
+                .unwrap_or_else(|| "⊘".to_string()),
             #[cfg(feature = "gpu")]
             ProcColumn::GpuMemValue | ProcColumn::GpuMemPercent => self.gpu_mem_usage.to_string(),
             #[cfg(feature = "gpu")]
@@ -418,7 +418,7 @@ impl DataToCell<ProcColumn> for ProcWidgetData {
             ProcColumn::Footprint => self
                 .footprint
                 .map(|b| Cow::Owned(binary_byte_string(b)))
-                .unwrap_or(Cow::Borrowed("—")),
+                .unwrap_or(Cow::Borrowed("⊘")),
             #[cfg(feature = "gpu")]
             ProcColumn::GpuMemValue | ProcColumn::GpuMemPercent => {
                 self.gpu_mem_usage.to_string().into()
