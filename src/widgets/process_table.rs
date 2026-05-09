@@ -168,6 +168,8 @@ fn make_column(column: ProcColumn) -> SortColumn<ProcColumn> {
         Priority => SortColumn::new(Priority).default_descending(),
         #[cfg(target_os = "linux")]
         PrivateCommit => SortColumn::hard(PrivateCommit, 8).default_descending(),
+        #[cfg(target_os = "linux")]
+        Footprint => SortColumn::hard(Footprint, 8).default_descending(),
         #[cfg(unix)]
         Nice => SortColumn::new(Nice),
         #[cfg(feature = "gpu")]
@@ -206,6 +208,8 @@ pub enum ProcWidgetColumn {
     Priority,
     #[cfg(target_os = "linux")]
     PrivateCommit,
+    #[cfg(target_os = "linux")]
+    Footprint,
     #[cfg(unix)]
     Nice,
     #[cfg(feature = "gpu")]
@@ -353,6 +357,8 @@ impl ProcWidgetState {
                             ProcWidgetColumn::Priority => Priority,
                             #[cfg(target_os = "linux")]
                             ProcWidgetColumn::PrivateCommit => PrivateCommit,
+                            #[cfg(target_os = "linux")]
+                            ProcWidgetColumn::Footprint => Footprint,
                             #[cfg(unix)]
                             ProcWidgetColumn::Nice => Nice,
                             #[cfg(feature = "gpu")]
@@ -396,9 +402,13 @@ impl ProcWidgetState {
                     // `processes.columns` list overrides this branch.
                     #[cfg(target_os = "linux")]
                     if crate::collection::linux::utils::is_strict_overcommit() {
-                        // Insert right after the Mem column (index 3) — reads
-                        // naturally next to the resident-memory number.
+                        // Surface both diagnostic columns next to Mem under
+                        // strict overcommit:
+                        //   - PrivCmt: commit-budget cost (gates new mmaps)
+                        //   - Fp:      real RAM+swap cost (fair-share Pss+SwapPss)
+                        // They answer different questions; both are needed.
                         default_columns.insert(4, PrivateCommit);
+                        default_columns.insert(5, Footprint);
                     }
 
                     default_columns.into_iter().map(make_column).collect()
@@ -427,6 +437,8 @@ impl ProcWidgetState {
                     Priority => ProcWidgetColumn::Priority,
                     #[cfg(target_os = "linux")]
                     PrivateCommit => ProcWidgetColumn::PrivateCommit,
+                    #[cfg(target_os = "linux")]
+                    Footprint => ProcWidgetColumn::Footprint,
                     #[cfg(unix)]
                     Nice => ProcWidgetColumn::Nice,
                     #[cfg(feature = "gpu")]

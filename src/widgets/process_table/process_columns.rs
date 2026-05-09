@@ -37,6 +37,13 @@ pub enum ProcColumn {
     /// Linux-only because it depends on `/proc/<pid>/status`.
     #[cfg(target_os = "linux")]
     PrivateCommit,
+    /// Memory Footprint: `Pss + SwapPss` from
+    /// `/proc/<pid>/smaps_rollup`. The "real cost" of a process to the
+    /// system: storage-backed memory it's on the hook for, fair-share-
+    /// divided across other mappers, summed across RAM and swap. Linux
+    /// only, since `smaps_rollup` is Linux-specific.
+    #[cfg(target_os = "linux")]
+    Footprint,
     #[cfg(feature = "gpu")]
     GpuMemValue,
     #[cfg(feature = "gpu")]
@@ -75,6 +82,8 @@ impl ProcColumn {
             ProcColumn::Priority => &["Priority"],
             #[cfg(target_os = "linux")]
             ProcColumn::PrivateCommit => &["PrivCmt", "PrivateCommit", "Private Commit", "PrivateBytes"],
+            #[cfg(target_os = "linux")]
+            ProcColumn::Footprint => &["Fp", "Footprint", "Memory Footprint", "Pss+Swap"],
         }
     }
 }
@@ -102,6 +111,8 @@ impl ColumnHeader for ProcColumn {
             ProcColumn::Priority => "Priority",
             #[cfg(target_os = "linux")]
             ProcColumn::PrivateCommit => "PrivCmt",
+            #[cfg(target_os = "linux")]
+            ProcColumn::Footprint => "Fp",
             #[cfg(feature = "gpu")]
             ProcColumn::GpuMemValue => "GMem",
             #[cfg(feature = "gpu")]
@@ -196,6 +207,10 @@ impl SortsRow for ProcColumn {
                     sort_partial_fn(descending)(a.private_commit, b.private_commit)
                 });
             }
+            #[cfg(target_os = "linux")]
+            ProcColumn::Footprint => {
+                data.sort_by(|a, b| sort_partial_fn(descending)(a.footprint, b.footprint));
+            }
             #[cfg(unix)]
             ProcColumn::Nice => {
                 data.sort_by(|a, b| sort_partial_fn(descending)(a.nice, b.nice));
@@ -242,6 +257,10 @@ impl<'de> Deserialize<'de> for ProcColumn {
             "privcmt" | "privatecommit" | "private commit" | "privatebytes" | "private_commit" => {
                 Ok(ProcColumn::PrivateCommit)
             }
+            #[cfg(target_os = "linux")]
+            "fp" | "footprint" | "memory footprint" | "memfp" | "pss+swap" | "pss" => {
+                Ok(ProcColumn::Footprint)
+            }
             #[cfg(feature = "gpu")]
             "gmem" | "gmem%" => Ok(ProcColumn::GpuMemPercent),
             #[cfg(feature = "gpu")]
@@ -271,6 +290,8 @@ impl From<&ProcColumn> for ProcWidgetColumn {
             ProcColumn::Priority => ProcWidgetColumn::Priority,
             #[cfg(target_os = "linux")]
             ProcColumn::PrivateCommit => ProcWidgetColumn::PrivateCommit,
+            #[cfg(target_os = "linux")]
+            ProcColumn::Footprint => ProcWidgetColumn::Footprint,
             #[cfg(unix)]
             ProcColumn::Nice => ProcWidgetColumn::Nice,
             #[cfg(feature = "gpu")]

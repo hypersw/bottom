@@ -218,6 +218,80 @@ impl Status {
     }
 }
 
+/// A wrapper around the relevant fields of `/proc/<PID>/smaps_rollup`.
+///
+/// Reads `Pss` (Proportional Set Size — fair-share resident bytes) and
+/// `SwapPss` (same, for swapped-out pages). The sum is the closest
+/// single per-process number to "what would actually free up if this
+/// process exited," accounting for shared pages and swap, and
+/// independent of the ephemeral RAM-vs-swap distinction.
+///
+/// Reading `smaps_rollup` requires either being the process owner or
+/// having `CAP_SYS_PTRACE`. Failure is non-fatal.
+pub(crate) struct SmapsRollup {
+    pub pss_bytes: u64,
+    pub swap_pss_bytes: u64,
+}
+
+impl SmapsRollup {
+    fn from_file(f: File, buffer: &mut String) -> anyhow::Result<SmapsRollup> {
+        const KB: u64 = 1024;
+
+        let mut reader = BufReader::new(f);
+        let mut pss: u64 = 0;
+        let mut swap_pss: u64 = 0;
+        let mut have_pss = false;
+        let mut have_swap_pss = false;
+
+        while let Ok(bytes) = reader.read_line(buffer) {
+            if bytes == 0 {
+                break;
+            }
+            let line = buffer.as_str();
+            // Order matters: SwapPss must be checked before Pss because
+            // both prefixes start with "Pss" — well, "SwapPss" doesn't,
+            // but `strip_prefix("Pss:")` would still miss SwapPss
+            // because of the leading "Swap". Belt-and-braces: use
+            // explicit equals on the key.
+            let key = line.split(':').next().unwrap_or("");
+            if key == "Pss" {
+                if let Some(rest) = line.strip_prefix("Pss:") {
+                    if let Some(tok) = rest.split_whitespace().next() {
+                        pss = tok.parse::<u64>().unwrap_or(0).saturating_mul(KB);
+                        have_pss = true;
+                    }
+                }
+            } else if key == "SwapPss" {
+                if let Some(rest) = line.strip_prefix("SwapPss:") {
+                    if let Some(tok) = rest.split_whitespace().next() {
+                        swap_pss = tok.parse::<u64>().unwrap_or(0).saturating_mul(KB);
+                        have_swap_pss = true;
+                    }
+                }
+            }
+            buffer.clear();
+            if have_pss && have_swap_pss {
+                break;
+            }
+        }
+
+        Ok(SmapsRollup {
+            pss_bytes: pss,
+            swap_pss_bytes: swap_pss,
+        })
+    }
+
+    /// Footprint = `Pss + SwapPss`. NT-style "real cost" of a process —
+    /// the storage-backed memory that this process is on the hook for,
+    /// fair-share-divided across other mappers, and bridged across the
+    /// RAM-vs-swap divide so it doesn't flicker as pages get swapped in
+    /// and out under pressure.
+    #[inline]
+    pub fn footprint_bytes(&self) -> u64 {
+        self.pss_bytes.saturating_add(self.swap_pss_bytes)
+    }
+}
+
 /// A wrapper around the data in `/proc/<PID>/io`.
 ///
 /// Note this does not necessarily get all fields, only the ones we use in
@@ -304,6 +378,7 @@ pub(crate) struct Process {
     pub uid: Option<uid_t>,
     pub stat: Stat,
     pub status: Option<Status>,
+    pub smaps_rollup: Option<SmapsRollup>,
     pub io: Option<Io>,
     pub cmdline: Option<String>,
 }
@@ -376,6 +451,15 @@ impl Process {
             .ok();
         reset(&mut root, buffer);
 
+        // /proc/<pid>/smaps_rollup — for Pss + SwapPss (Footprint
+        // column). Fails for processes owned by other users without
+        // CAP_SYS_PTRACE; that's expected and we just won't have a
+        // value for those rows.
+        let smaps_rollup = open_at(&mut root, "smaps_rollup", &pid_dir)
+            .and_then(|file| SmapsRollup::from_file(file, buffer))
+            .ok();
+        reset(&mut root, buffer);
+
         let cmdline = if cmdline(&mut root, &pid_dir, buffer).is_ok() {
             // The clone will give a string with the capacity of the length of buffer, don't worry.
             Some(buffer.clone())
@@ -398,6 +482,7 @@ impl Process {
                 uid,
                 stat,
                 status,
+                smaps_rollup,
                 io,
                 cmdline,
             },

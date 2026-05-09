@@ -160,6 +160,14 @@ pub struct ProcessHarvest {
     /// Approximates NT "Private Bytes" / per-process commit charge.
     #[cfg(target_os = "linux")]
     pub private_commit: u64,
+
+    /// Memory Footprint on Linux: `Pss + SwapPss` from
+    /// `/proc/<pid>/smaps_rollup`. Kept as bytes; 0 when unavailable
+    /// (other-user processes without `CAP_SYS_PTRACE`). Closest single
+    /// number to "what closing this process actually frees from
+    /// RAM+swap, fair-share-divided across other mappers."
+    #[cfg(target_os = "linux")]
+    pub footprint: u64,
     // TODO: Additional fields
     // pub rss_kb: u64,
     // pub virt_kb: u64,

@@ -224,6 +224,9 @@ pub struct ProcWidgetData {
     /// Private Commit estimate in bytes (`VmData + VmStk`). Linux-only.
     #[cfg(target_os = "linux")]
     pub private_commit: u64,
+    /// Memory Footprint in bytes (`Pss + SwapPss`). Linux-only.
+    #[cfg(target_os = "linux")]
+    pub footprint: u64,
 }
 
 impl ProcWidgetData {
@@ -275,6 +278,8 @@ impl ProcWidgetData {
             priority: process.priority,
             #[cfg(target_os = "linux")]
             private_commit: process.private_commit,
+            #[cfg(target_os = "linux")]
+            footprint: process.footprint,
         }
     }
 
@@ -306,6 +311,7 @@ impl ProcWidgetData {
         #[cfg(target_os = "linux")]
         {
             self.private_commit = self.private_commit.saturating_add(other.private_commit);
+            self.footprint = self.footprint.saturating_add(other.footprint);
         }
         #[cfg(feature = "gpu")]
         {
@@ -345,6 +351,8 @@ impl ProcWidgetData {
             ProcColumn::Time => format_time(self.time),
             #[cfg(target_os = "linux")]
             ProcColumn::PrivateCommit => binary_byte_string(self.private_commit),
+            #[cfg(target_os = "linux")]
+            ProcColumn::Footprint => binary_byte_string(self.footprint),
             #[cfg(feature = "gpu")]
             ProcColumn::GpuMemValue | ProcColumn::GpuMemPercent => self.gpu_mem_usage.to_string(),
             #[cfg(feature = "gpu")]
@@ -389,6 +397,8 @@ impl DataToCell<ProcColumn> for ProcWidgetData {
             ProcColumn::Time => format_time(self.time).into(),
             #[cfg(target_os = "linux")]
             ProcColumn::PrivateCommit => binary_byte_string(self.private_commit).into(),
+            #[cfg(target_os = "linux")]
+            ProcColumn::Footprint => binary_byte_string(self.footprint).into(),
             #[cfg(feature = "gpu")]
             ProcColumn::GpuMemValue | ProcColumn::GpuMemPercent => {
                 self.gpu_mem_usage.to_string().into()
