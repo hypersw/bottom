@@ -1256,6 +1256,10 @@ mod test {
             #[cfg(unix)]
             nice: 0,
             priority: -20,
+            #[cfg(target_os = "linux")]
+            private_commit: 0,
+            #[cfg(target_os = "linux")]
+            footprint: None,
         };
 
         let b = ProcWidgetData {
